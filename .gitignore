@@ -1,0 +1,7 @@
+node_modules
+dist
+# secrets and anything generated from them
+.env
+.env.*
+!.env.example
+postman/local.postman_environment.json

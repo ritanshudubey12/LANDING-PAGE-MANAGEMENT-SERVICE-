@@ -1,0 +1,430 @@
+openapi: 3.1.0
+info:
+  title: Landing Page Management API
+  version: 1.0.0
+  description: |
+    Manages landing-page identity and metadata within a website. Content/revisions are owned by the
+    Document/Draft-Version service and publication by the Publishing service.
+
+    **Authentication (topology B):** this service is private; callers present the gateway's
+    service-to-service Bearer credential. Context headers are trusted only after that credential validates.
+
+    **IDs:** PostgreSQL BIGINT, always serialized as decimal strings (`^[1-9][0-9]*$`, max 9223372036854775807).
+
+    **Success:** every successful call returns HTTP 200 with `{ success: true, data, requestId }`.
+
+    **Slug policy:** lowercase letters/digits/single hyphens, max 180. ACTIVE non-deleted pages reserve a slug per
+    website (case-insensitive). Archived and deleted pages release their slug.
+
+    **DELETE policy:** soft-delete (tombstone) with audit trail; a live page is unpublished first.
+servers:
+  - url: http://localhost:4027
+security:
+  - bearerAuth: []
+tags:
+  - name: Landing pages
+  - name: Operations
+paths:
+  /health:
+    get:
+      tags: [Operations]
+      summary: Liveness
+      security: []
+      responses:
+        '200':
+          description: Process is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthEnvelope'
+  /ready:
+    get:
+      tags: [Operations]
+      summary: Readiness (database and required integrations)
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyEnvelope'
+        '503':
+          description: A required dependency is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyEnvelope'
+  /api/v1/websites/{websiteId}/landing-pages:
+    parameters:
+      - $ref: '#/components/parameters/WebsiteId'
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/OrganizationId'
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/SoftwareId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/Permissions'
+    post:
+      tags: [Landing pages]
+      summary: Create an unpublished landing page
+      description: 'Requires `landing-page:create`.'
+      operationId: createLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLandingPage'
+      responses:
+        '200':
+          $ref: '#/components/responses/LandingPage'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    get:
+      tags: [Landing pages]
+      summary: List landing pages (cursor pagination)
+      description: 'Requires `landing-page:read`. Ordered by the chosen allowlisted sort key then id.'
+      operationId: listLandingPages
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, description: Opaque `meta.nextCursor` from the previous page; must match sortBy/order., schema: { type: string, maxLength: 512 } }
+        - { name: sortBy, in: query, schema: { type: string, enum: [createdAt, updatedAt, name], default: createdAt } }
+        - { name: order, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+        - { name: lifecycleStatus, in: query, schema: { $ref: '#/components/schemas/LifecycleStatus' } }
+        - { name: publicationStatus, in: query, schema: { $ref: '#/components/schemas/PublicationStatus' } }
+        - { name: q, in: query, description: Case-insensitive substring of name or slug., schema: { type: string, minLength: 1, maxLength: 100 } }
+      responses:
+        '200':
+          description: A page of landing pages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LandingPageListEnvelope'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /api/v1/landing-pages/{landingPageId}:
+    parameters:
+      - $ref: '#/components/parameters/LandingPageId'
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/OrganizationId'
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/SoftwareId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/Permissions'
+    get:
+      tags: [Landing pages]
+      summary: Get landing page metadata
+      description: 'Requires `landing-page:read`. Pages outside the caller scope return 404.'
+      operationId: getLandingPage
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Landing pages]
+      summary: Rename or change slug
+      description: |
+        Requires `landing-page:update`. Send `If-Match` with the last ETag for optimistic concurrency.
+        Never changes publication state.
+      operationId: updateLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLandingPage'
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '412': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Landing pages]
+      summary: Replace name and slug (full update)
+      description: 'Requires `landing-page:update`. Both `name` and `slug` are required. Never changes publication state.'
+      operationId: replaceLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceLandingPage'
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '412': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Landing pages]
+      summary: Soft-delete a landing page
+      description: 'Requires `landing-page:delete`. Unpublishes first when live; 503 if Publishing does not confirm.'
+      operationId: deleteLandingPage
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteEnvelope'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/landing-pages/{landingPageId}/duplicate:
+    parameters:
+      - $ref: '#/components/parameters/LandingPageId'
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/OrganizationId'
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/SoftwareId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/Permissions'
+    post:
+      tags: [Landing pages]
+      summary: Duplicate into an independent, unpublished page
+      description: 'Requires `landing-page:duplicate`. New ID, independent draft document, no publication state inherited.'
+      operationId: duplicateLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DuplicateLandingPage'
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /api/v1/landing-pages/{landingPageId}/publish:
+    parameters:
+      - $ref: '#/components/parameters/LandingPageId'
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/OrganizationId'
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/SoftwareId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/Permissions'
+    post:
+      tags: [Landing pages]
+      summary: Request publication
+      description: 'Requires `landing-page:publish`. Reports only the state Publishing confirms (may be PUBLISH_PENDING).'
+      operationId: publishLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/landing-pages/{landingPageId}/unpublish:
+    parameters:
+      - $ref: '#/components/parameters/LandingPageId'
+      - $ref: '#/components/parameters/TenantId'
+      - $ref: '#/components/parameters/OrganizationId'
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/SoftwareId'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/Permissions'
+    post:
+      tags: [Landing pages]
+      summary: Request unpublication
+      description: 'Requires `landing-page:publish`. 409 when the page is not published.'
+      operationId: unpublishLandingPage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { $ref: '#/components/responses/LandingPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Gateway service-to-service credential (never a browser token).
+  parameters:
+    WebsiteId: { name: websiteId, in: path, required: true, schema: { $ref: '#/components/schemas/BigIntId' } }
+    LandingPageId: { name: landingPageId, in: path, required: true, schema: { $ref: '#/components/schemas/BigIntId' } }
+    TenantId: { name: X-Tenant-Id, in: header, required: true, schema: { $ref: '#/components/schemas/BigIntId' } }
+    OrganizationId: { name: X-Organization-Id, in: header, required: true, schema: { $ref: '#/components/schemas/BigIntId' } }
+    UserId: { name: X-User-Id, in: header, required: true, schema: { $ref: '#/components/schemas/BigIntId' } }
+    SoftwareId: { name: X-Software-Id, in: header, required: false, schema: { $ref: '#/components/schemas/BigIntId' } }
+    RequestId: { name: X-Request-Id, in: header, required: false, description: 'Generated when absent or malformed.', schema: { type: string, pattern: '^[A-Za-z0-9._-]{8,64}$' } }
+    Permissions:
+      name: X-Permissions
+      in: header
+      required: true
+      description: Comma-separated permissions asserted by the trusted gateway after it validated the end user.
+      schema: { type: string, example: 'landing-page:read,landing-page:update' }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 200 } }
+    IfMatch: { name: If-Match, in: header, required: false, description: 'ETag from a previous response, e.g. "page-v3". Stale => 412.', schema: { type: string, example: '"page-v3"' } }
+  responses:
+    LandingPage:
+      description: A landing page
+      headers:
+        ETag: { schema: { type: string, example: '"page-v1"' } }
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LandingPageEnvelope'
+    Error:
+      description: Error (400 malformed, 401 credential, 403 permission, 404 absent/out of scope, 409 conflict, 412 stale ETag, 422 validation, 429 rate limit, 503 dependency)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    BigIntId:
+      type: string
+      pattern: '^[1-9][0-9]*$'
+      maxLength: 19
+      description: PostgreSQL BIGINT as a decimal string. Maximum 9223372036854775807.
+      example: '9007199254740993'
+    LifecycleStatus: { type: string, enum: [ACTIVE, ARCHIVED] }
+    PublicationStatus: { type: string, enum: [UNPUBLISHED, PUBLISHED, PUBLISH_PENDING, UNPUBLISH_PENDING, FAILED] }
+    Slug: { type: string, minLength: 1, maxLength: 180, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+    CreateLandingPage:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        slug: { $ref: '#/components/schemas/Slug' }
+    UpdateLandingPage:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        slug: { $ref: '#/components/schemas/Slug' }
+    ReplaceLandingPage:
+      type: object
+      additionalProperties: false
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        slug: { $ref: '#/components/schemas/Slug' }
+    DuplicateLandingPage:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        slug: { $ref: '#/components/schemas/Slug' }
+    LandingPage:
+      type: object
+      required: [id, websiteId, name, slug, lifecycleStatus, publicationStatus, documentId, publishedRevisionId, hasUnpublishedChanges, version, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/BigIntId' }
+        websiteId: { $ref: '#/components/schemas/BigIntId' }
+        name: { type: string }
+        slug: { type: string }
+        lifecycleStatus: { $ref: '#/components/schemas/LifecycleStatus' }
+        publicationStatus: { $ref: '#/components/schemas/PublicationStatus' }
+        documentId: { $ref: '#/components/schemas/BigIntId' }
+        publishedRevisionId: { oneOf: [{ $ref: '#/components/schemas/BigIntId' }, { type: 'null' }] }
+        hasUnpublishedChanges: { type: boolean }
+        version: { type: integer, description: 'Backs the ETag page-v{version}.' }
+        createdBy: { $ref: '#/components/schemas/BigIntId' }
+        updatedBy: { $ref: '#/components/schemas/BigIntId' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+    LandingPageEnvelope:
+      type: object
+      required: [success, data, requestId]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/LandingPage' }
+        requestId: { type: string }
+    LandingPageListEnvelope:
+      type: object
+      required: [success, data, meta, requestId]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LandingPage' }
+        meta:
+          type: object
+          properties:
+            limit: { type: integer }
+            nextCursor: { type: [string, 'null'] }
+        requestId: { type: string }
+    DeleteEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          properties:
+            id: { $ref: '#/components/schemas/BigIntId' }
+            deleted: { type: boolean, const: true }
+        requestId: { type: string }
+    HealthEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: { type: object, properties: { status: { type: string } } }
+        requestId: { type: string }
+    ReadyEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            status: { type: string, enum: [ready, not_ready] }
+            checks:
+              type: object
+              properties:
+                database: { type: boolean }
+                integrations: { type: boolean }
+        requestId: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [success, error, requestId]
+      properties:
+        success: { type: boolean, const: false }
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code: { type: string, example: LANDING_PAGE_SLUG_CONFLICT }
+            message: { type: string }
+            details: { type: array, items: {} }
+        requestId: { type: string }

@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: landing-page-postgres
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: website_builder
+    ports:
+      - "5441:5432"
+    volumes:
+      - landing_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d website_builder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    container_name: landing-page-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4027:4027"
+    environment:
+      # Local development defaults only. NODE_ENV=development because INTEGRATIONS_MODE=stub is blocked in production.
+      NODE_ENV: development
+      PORT: 4027
+      DATABASE_URL: postgresql://app_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/website_builder
+      AUTH_MODE: bff_internal
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN in .env}
+      INTEGRATIONS_MODE: stub
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4027/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  landing_pg_data:

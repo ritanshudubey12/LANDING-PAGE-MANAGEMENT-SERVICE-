@@ -1,0 +1,1089 @@
+{
+  "info": {
+    "name": "Landing Page Management API",
+    "description": "All requests assert HTTP 200 and success=true. Local-development credentials only; do not export real secrets.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4027"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "tenantId",
+      "value": "1001"
+    },
+    {
+      "key": "organizationId",
+      "value": "2001"
+    },
+    {
+      "key": "softwareId",
+      "value": "10"
+    },
+    {
+      "key": "userId",
+      "value": "5001"
+    },
+    {
+      "key": "websiteId",
+      "value": "3001"
+    },
+    {
+      "key": "permissions",
+      "value": "landing-page:create,landing-page:read,landing-page:update,landing-page:duplicate,landing-page:delete,landing-page:publish"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 GET /health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('status ok', () => pm.expect(body.data.status).to.eql('ok'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "02 GET /ready",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('dependencies ready', () => pm.expect(body.data.checks).to.eql({ database: true, integrations: true }));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/ready",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "ready"
+          ]
+        }
+      }
+    },
+    {
+      "name": "03 POST create landing page",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const n = Date.now();",
+              "pm.collectionVariables.set('slug', 'spring-' + n);",
+              "pm.collectionVariables.set('createKey', 'create-' + n);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.collectionVariables.set('pageId', body.data.id);",
+              "pm.collectionVariables.set('etag', pm.response.headers.get('ETag'));",
+              "pm.collectionVariables.set('firstCreateBody', JSON.stringify({ name: 'Spring Campaign', slug: pm.collectionVariables.get('slug') }));",
+              "pm.test('IDs are strings', () => { pm.expect(body.data.id).to.be.a('string'); pm.expect(body.data.websiteId).to.eql(pm.collectionVariables.get('websiteId')); });",
+              "pm.test('starts unpublished', () => { pm.expect(body.data.publicationStatus).to.eql('UNPUBLISHED'); pm.expect(body.data.publishedRevisionId).to.eql(null); pm.expect(body.data.lifecycleStatus).to.eql('ACTIVE'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{createKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/landing-pages",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "websites",
+            "{{websiteId}}",
+            "landing-pages"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Spring Campaign\",\n  \"slug\": \"{{slug}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "04 POST create (idempotent replay returns same page)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('same page returned', () => pm.expect(body.data.id).to.eql(pm.collectionVariables.get('pageId')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{createKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/landing-pages",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "websites",
+            "{{websiteId}}",
+            "landing-pages"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Spring Campaign\",\n  \"slug\": \"{{slug}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "05 GET list landing pages",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('data is an array containing the new page', () => pm.expect(body.data.map(p => p.id)).to.include(pm.collectionVariables.get('pageId')));",
+              "pm.test('pagination meta present', () => pm.expect(body.meta).to.have.property('limit', 20));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/landing-pages?limit=20&sortBy=createdAt&order=desc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "websites",
+            "{{websiteId}}",
+            "landing-pages"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "sortBy",
+              "value": "createdAt"
+            },
+            {
+              "key": "order",
+              "value": "desc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "06 GET list with filters (q, publicationStatus)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('data is an array', () => pm.expect(body.data).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/websites/{{websiteId}}/landing-pages?limit=5&publicationStatus=UNPUBLISHED&lifecycleStatus=ACTIVE&q=spring",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "websites",
+            "{{websiteId}}",
+            "landing-pages"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            },
+            {
+              "key": "publicationStatus",
+              "value": "UNPUBLISHED"
+            },
+            {
+              "key": "lifecycleStatus",
+              "value": "ACTIVE"
+            },
+            {
+              "key": "q",
+              "value": "spring"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "07 GET landing page by id",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('id matches', () => pm.expect(body.data.id).to.eql(pm.collectionVariables.get('pageId')));",
+              "pm.collectionVariables.set('etag', pm.response.headers.get('ETag'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "08 PATCH rename / change slug (If-Match)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('renamed', () => pm.expect(body.data.name).to.eql('Spring Sale'));",
+              "pm.test('still unpublished', () => pm.expect(body.data.publicationStatus).to.eql('UNPUBLISHED'));",
+              "pm.collectionVariables.set('etag', pm.response.headers.get('ETag'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "If-Match",
+            "value": "{{etag}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Spring Sale\",\n  \"slug\": \"{{slug}}-sale\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "09 PUT replace name and slug (If-Match)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('replaced', () => { pm.expect(body.data.name).to.eql('Spring Sale Final'); pm.expect(body.data.slug).to.eql(pm.collectionVariables.get('slug') + '-final'); });",
+              "pm.test('still unpublished', () => pm.expect(body.data.publicationStatus).to.eql('UNPUBLISHED'));",
+              "pm.collectionVariables.set('etag', pm.response.headers.get('ETag'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "If-Match",
+            "value": "{{etag}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Spring Sale Final\",\n  \"slug\": \"{{slug}}-final\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "10 POST duplicate landing page",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.collectionVariables.set('duplicateId', body.data.id);",
+              "pm.test('new independent unpublished page', () => { pm.expect(body.data.id).to.not.eql(pm.collectionVariables.get('pageId')); pm.expect(body.data.publicationStatus).to.eql('UNPUBLISHED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "dup-{{$timestamp}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}/duplicate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}",
+            "duplicate"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Spring Campaign - Copy\",\n  \"slug\": \"{{slug}}-copy\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "11 POST publish",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('published', () => { pm.expect(body.data.publicationStatus).to.eql('PUBLISHED'); pm.expect(body.data.publishedRevisionId).to.be.a('string'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "pub-{{$timestamp}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}/publish",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}",
+            "publish"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "12 POST unpublish",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('unpublished', () => { pm.expect(body.data.publicationStatus).to.eql('UNPUBLISHED'); pm.expect(body.data.publishedRevisionId).to.eql(null); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "unpub-{{$timestamp}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}/unpublish",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}",
+            "unpublish"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "13 DELETE duplicate (soft-delete)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('deleted', () => pm.expect(body.data.deleted).to.eql(true));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{duplicateId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{duplicateId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "14 DELETE original (soft-delete)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('success is true', () => pm.expect(body.success).to.eql(true));",
+              "pm.test('requestId is present', () => pm.expect(body.requestId).to.be.a('string').and.not.empty);",
+              "pm.test('deleted', () => pm.expect(body.data.deleted).to.eql(true));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "{{tenantId}}"
+          },
+          {
+            "key": "X-Organization-Id",
+            "value": "{{organizationId}}"
+          },
+          {
+            "key": "X-Software-Id",
+            "value": "{{softwareId}}"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          },
+          {
+            "key": "X-Request-Id",
+            "value": "req_postman_{{$timestamp}}"
+          },
+          {
+            "key": "X-Permissions",
+            "value": "{{permissions}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/landing-pages/{{pageId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "landing-pages",
+            "{{pageId}}"
+          ]
+        }
+      }
+    }
+  ]
+}
